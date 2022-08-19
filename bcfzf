@@ -1,33 +1,27 @@
 #!/bin/bash
 
 check_requirements() {
+    local _reqs=( "fzf" "bandcamp-dl" "pup" "curl" "jq" )
+
     if (( $# < 1 )); then
         echo "Please pass a string containing the query you wish to search."
         exit
     fi
 
-    if [ ! -x ${fzf} ]; then
-        echo "Please install fzf first."
-        exit
-    fi
-
-    if [ ! -x $(bandcamp-dl) ]; then
-        echo "Please install bandcamp-dl first."
-        exit
-    fi
-
-    if [ ! -x ${pup} ]; then
-        echo "Please install pup first."
-        exit
-    fi
+    for req in "${_reqs[@]}"; do
+        if [ ! -x $req ]; then
+            echo "Please install ${req} first."
+            # exit
+        fi
+    done
 }
 
 parse_search_query() {
     local _search="${1}"
 
-    _return="$(echo $_search | sed -e 's~\s~%2B~g')"
+    local _return="$(echo $_search | sed -e 's~\s~%2B~g')"
 
-    echo $_return
+    echo -n ${_return}
 }
 
 make_bandcamp_search_url() {
@@ -41,14 +35,35 @@ make_bandcamp_search_url() {
 
 search_bandcamp() {
     local _url="${1}"
-    local _page=$(curl ${_url})
+
+    echo "Searching..."
+
+    local _page=$(curl -s ${_url})
 
     echo -n ${_page}
 }
 
 # RETURN: a list of bandcamp urls
 parse_bandcamp() {
-    echo "hi"
+    local _json="${1}"
+
+    declare -A entries=()
+
+    local url=$(echo "${_json}" | jq --raw-output '.[].children[1].children[0].href')
+
+    local title=$(echo "${_json}" | jq --raw-output '.[].children[1].children[0].text')
+
+    local artist=$(echo "${_json}" | jq --raw-output '.[].children[2].text')
+
+    local number_of_entries=${#url[@]}
+
+    for (( i=0; i<${number_of_entries}; i++ )); do
+        entries["${url[i]}"]="${title[i]} ${artist[i]}"
+        # entries+=( ["${url[i]}"]="${title[i]} ${artist[i]}" )
+    done
+
+    echo "${entries[@]}"
+    # echo "${artist}"
 }
 
 _search=$(parse_search_query "${1}")
@@ -60,4 +75,8 @@ _url=$(make_bandcamp_search_url "${_search}" "${_item_type}")
 
 _page=$(search_bandcamp "${_url}")
 
-echo $_page | pup '.results li json{}' > page5.html
+_json=$(echo "${_page}" | pup '.results li .result-info json{}')
+
+_output=$(parse_bandcamp "${_json}")
+
+echo "${_output}" | bat # fzf --height 40% --reverse --border
