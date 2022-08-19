@@ -1,0 +1,63 @@
+#!/bin/bash
+
+check_requirements() {
+    if (( $# < 1 )); then
+        echo "Please pass a string containing the query you wish to search."
+        exit
+    fi
+
+    if [ ! -x ${fzf} ]; then
+        echo "Please install fzf first."
+        exit
+    fi
+
+    if [ ! -x $(bandcamp-dl) ]; then
+        echo "Please install bandcamp-dl first."
+        exit
+    fi
+
+    if [ ! -x ${pup} ]; then
+        echo "Please install pup first."
+        exit
+    fi
+}
+
+parse_search_query() {
+    local _search="${1}"
+
+    _return="$(echo $_search | sed -e 's~\s~%2B~g')"
+
+    echo $_return
+}
+
+make_bandcamp_search_url() {
+    local _search="${1}"
+    local _item_type="${2}"
+
+    local bandcamp_url="https://bandcamp.com/search?q=${_search}&item_type=${_item_type}"
+
+    echo -n ${bandcamp_url}
+}
+
+search_bandcamp() {
+    local _url="${1}"
+    local _page=$(curl ${_url})
+
+    echo -n ${_page}
+}
+
+# RETURN: a list of bandcamp urls
+parse_bandcamp() {
+    echo "hi"
+}
+
+_search=$(parse_search_query "${1}")
+_item_type="${2}"
+
+check_requirements "${_search}" "${_item_type}"
+
+_url=$(make_bandcamp_search_url "${_search}" "${_item_type}")
+
+_page=$(search_bandcamp "${_url}")
+
+echo $_page | pup '.results li json{}' > page5.html
